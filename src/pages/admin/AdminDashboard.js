@@ -1,0 +1,708 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { FaUsers, FaBuilding, FaRecycle, FaGift, FaChartBar, FaCog, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import LocationsAdmin from './LocationsAdmin';
+import NewsAdmin from './NewsAdmin';
+import './AdminDashboard.css';
+
+const AdminDashboard = () => {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // live data states
+  const [stats, setStats] = useState({ totalUsers: 0, totalBusinesses: 0, totalLocations: 0, totalNews: 0, totalPoints: 0 });
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [recentCollections, setRecentCollections] = useState([]);
+  const [pendingBusinesses, setPendingBusinesses] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [allBusinesses, setAllBusinesses] = useState([]);
+  const [voucherForm, setVoucherForm] = useState({ businessId: '', title: '', description: '', expiry: '', images: '', quantity: 0, pointsRequired: 0, status: 'active' });
+  const [editingVoucherId, setEditingVoucherId] = useState(null);
+  const [voucherImages, setVoucherImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    // load dashboard stats and lists
+    const load = async () => {
+      await loadAdminData();
+    };
+    load();
+  }, [user]);
+
+  const loadAdminData = async () => {
+    setLoading(true);
+    try {
+      const [sRes, usersRes, businessesRes, locationsRes] = await Promise.all([
+        fetch(`${API}/api/admin/stats`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/admin/users?limit=10`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/admin/businesses?pending=true`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/api/locations`),
+        fetch(`${API}/api/admin/vouchers`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      if (sRes.ok) setStats(await sRes.json());
+      if (usersRes.ok) {
+        const u = await usersRes.json();
+        setRecentUsers(u.users || []);
+      }
+      if (businessesRes.ok) {
+        const b = await businessesRes.json();
+        setPendingBusinesses(b.businesses || []);
+      }
+      // vouchers
+      try {
+        const vres = await (await fetch(`${API}/api/admin/vouchers`, { headers: { Authorization: `Bearer ${token}` } })).json();
+        if (vres && Array.isArray(vres.vouchers)) setVouchers(vres.vouchers);
+      } catch (err) {
+        // ignore
+      }
+
+      // all businesses for voucher dropdown
+      try {
+        const bres = await fetch(`${API}/api/admin/businesses`, { headers: { Authorization: `Bearer ${token}` } });
+        if (bres.ok) {
+          const jb = await bres.json();
+          // adminController.listBusinesses returns { businesses }
+          if (jb.businesses && Array.isArray(jb.businesses)) setAllBusinesses(jb.businesses);
+          else if (Array.isArray(jb)) setAllBusinesses(jb);
+        }
+      } catch (err) {
+        // ignore
+      }
+      if (locationsRes.ok) {
+        const locs = await locationsRes.json();
+        setRecentCollections((locs || []).slice(0, 10).map(l => ({ id: l._id, user: l.name || '', pinType: l.type, quantity: 0, points: 0, date: (l.createdAt || '').slice(0,10) })));
+      }
+    } catch (err) {
+      console.error('load admin dashboard', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // forms state for users and businesses
+  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', phone: '', address: '', role: 'citizen' });
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [businessForm, setBusinessForm] = useState({ userId: '', companyName: '', taxCode: '', verified: false });
+  const [editingBusinessId, setEditingBusinessId] = useState(null);
+
+  // User CRUD
+  const handleEditUser = (u) => {
+    setEditingUserId(u._id || u.id);
+    setUserForm({ name: u.name || '', email: u.email || '', password: '', phone: u.phone || '', address: u.address || '', role: u.role || u.type || 'citizen' });
+  };
+
+  const handleCancelEditUser = () => { setEditingUserId(null); setUserForm({ name: '', email: '', password: '', phone: '', address: '', role: 'citizen' }); };
+
+  const submitUser = async (e) => {
+    e && e.preventDefault();
+    try {
+      const method = editingUserId ? 'PUT' : 'POST';
+      const url = editingUserId ? `${API}/api/admin/users/${editingUserId}` : `${API}/api/admin/users`;
+      const payload = { ...userForm };
+      // don't send empty password on update
+      if (editingUserId && !payload.password) delete payload.password;
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+      handleCancelEditUser();
+    } catch (err) {
+      console.error('submitUser', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const deleteUser = async (id) => {
+    if (!confirm('Xác nhận xóa người dùng này?')) return;
+    try {
+      const res = await fetch(`${API}/api/admin/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+    } catch (err) {
+      console.error('deleteUser', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  // Business CRUD & approve
+  const handleEditBusiness = (b) => {
+    setEditingBusinessId(b._id);
+    setBusinessForm({ userId: b.userId?._id || (b.userId || ''), companyName: b.companyName || '', taxCode: b.taxCode || '', verified: !!b.verified });
+  };
+
+  const handleCancelEditBusiness = () => { setEditingBusinessId(null); setBusinessForm({ userId: '', companyName: '', taxCode: '', verified: false }); };
+
+  const submitBusiness = async (e) => {
+    e && e.preventDefault();
+    try {
+      const method = editingBusinessId ? 'PUT' : 'POST';
+      const url = editingBusinessId ? `${API}/api/admin/businesses/${editingBusinessId}` : `${API}/api/admin/businesses`;
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(businessForm) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+      handleCancelEditBusiness();
+    } catch (err) {
+      console.error('submitBusiness', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const deleteBusiness = async (id) => {
+    if (!confirm('Xác nhận xóa doanh nghiệp này?')) return;
+    try {
+      const res = await fetch(`${API}/api/admin/businesses/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+    } catch (err) {
+      console.error('deleteBusiness', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const approveBusinessNow = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/admin/businesses/${id}/approve`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+    } catch (err) {
+      console.error('approveBusinessNow', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  // Vouchers CRUD
+  const handleEditVoucher = (v) => {
+    setEditingVoucherId(v._id);
+    setVoucherForm({ businessId: v.businessId?._id || (v.businessId || ''), title: v.title || '', description: v.description || '', expiry: v.expiry ? (new Date(v.expiry)).toISOString().slice(0,10) : '', images: (v.images && v.images.length) ? v.images.join(', ') : '', quantity: v.quantity || 0, pointsRequired: v.pointsRequired || 0, status: v.status || 'active' });
+    setVoucherImages((v.images && v.images.length) ? v.images.slice() : []);
+  };
+
+  const handleCancelEditVoucher = () => { setEditingVoucherId(null); setVoucherForm({ businessId: '', title: '', description: '', expiry: '', images: '', quantity: 0, pointsRequired: 0, status: 'active' }); setVoucherImages([]); };
+
+  const submitVoucher = async (e) => {
+    e && e.preventDefault();
+    try {
+      const method = editingVoucherId ? 'PUT' : 'POST';
+      const url = editingVoucherId ? `${API}/api/admin/vouchers/${editingVoucherId}` : `${API}/api/admin/vouchers`;
+      const payload = { ...voucherForm };
+      // convert expiry empty string to undefined
+      if (!payload.expiry) delete payload.expiry;
+      // use uploaded images array
+      payload.images = voucherImages.slice();
+      // ensure pointsRequired is a number
+      payload.pointsRequired = Number(payload.pointsRequired) || 0;
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+      handleCancelEditVoucher();
+    } catch (err) {
+      console.error('submitVoucher', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  // Upload image file to backend and append returned URL to voucherImages
+  const uploadImageFile = async (file) => {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API}/api/uploads`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Upload failed');
+      if (data.url) {
+        setVoucherImages(prev => [...prev, data.url]);
+      }
+    } catch (err) {
+      console.error('uploadImageFile', err);
+      alert('Upload ảnh thất bại');
+    }
+  };
+
+  const handleFileInput = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    uploadImageFile(f);
+    // clear input
+    e.target.value = '';
+  };
+
+  const removeImage = (url) => {
+    setVoucherImages(prev => prev.filter(u => u !== url));
+  };
+
+  const deleteVoucher = async (id) => {
+    if (!confirm('Xác nhận xóa voucher này?')) return;
+    try {
+      const res = await fetch(`${API}/api/admin/vouchers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      await loadAdminData();
+    } catch (err) {
+      console.error('deleteVoucher', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="admin-dashboard">
+        <div className="container">
+          <div className="text-center">
+            <h2>Bạn không có quyền truy cập trang này</h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: 'dashboard', name: 'Tổng quan', icon: <FaChartBar /> },
+    { id: 'users', name: 'Người dùng', icon: <FaUsers /> },
+    { id: 'businesses', name: 'Doanh nghiệp', icon: <FaBuilding /> },
+    { id: 'news', name: 'Tin tức', icon: <FaChartBar /> },
+    { id: 'collections', name: 'Thu gom pin', icon: <FaRecycle /> },
+    { id: 'locations', name: 'Điểm thu gom', icon: <FaRecycle /> },
+    { id: 'vouchers', name: 'Voucher', icon: <FaGift /> },
+    { id: 'settings', name: 'Cài đặt', icon: <FaCog /> }
+  ];
+
+  return (
+    <div className="admin-dashboard">
+      <div className="container">
+        <div className="page-header">
+          <h1>Admin Dashboard</h1>
+          <p>Quản lý hệ thống Pin Swap</p>
+        </div>
+
+        <div className="admin-content">
+          {/* Sidebar */}
+          <div className="admin-sidebar">
+            <div className="sidebar-header">
+              <h3>Quản lý</h3>
+            </div>
+            <nav className="sidebar-nav">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.icon}
+                  <span>{tab.name}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Main Content */}
+          <div className="admin-main">
+            {activeTab === 'dashboard' && (
+              <div className="dashboard-content">
+                {/* Stats Cards */}
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <FaUsers />
+                    </div>
+                    <div className="stat-content">
+                      <h3>{(stats.totalUsers || 0).toLocaleString()}</h3>
+                      <p>Tổng người dùng</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <FaBuilding />
+                    </div>
+                    <div className="stat-content">
+                      <h3>{stats.totalBusinesses || 0}</h3>
+                      <p>Doanh nghiệp</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <FaRecycle />
+                    </div>
+                    <div className="stat-content">
+                      <h3>{(stats.totalLocations || 0).toLocaleString()}</h3>
+                      <p>Pin đã thu gom</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">
+                      <FaGift />
+                    </div>
+                    <div className="stat-content">
+                      <h3>{stats.totalNews || 0}</h3>
+                      <p>Tin tức</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="activity-section">
+                  <div className="activity-card">
+                    <h3>Người dùng mới</h3>
+                    <div className="table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Tên</th>
+                            <th>Email</th>
+                            <th>Loại</th>
+                            <th>Ngày tham gia</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentUsers.map(u => (
+                            <tr key={u._id || u.id}>
+                              <td>{u.name}</td>
+                              <td>{u.email}</td>
+                              <td>
+                                <span className={`type-badge ${u.role || u.type}`}>
+                                  {u.role === 'citizen' || u.type === 'user' ? 'Người dân' : (u.role === 'business' ? 'Doanh nghiệp' : u.role)}
+                                </span>
+                              </td>
+                              <td>{(u.createdAt || u.joinDate || '').slice(0,10)}</td>
+                              <td>
+                                <span className={`status-badge ${u.status || 'active'}`}>
+                                  {(u.status === 'active' || u.status === undefined) ? 'Hoạt động' : u.status}
+                                </span>
+                              </td>
+                              <td>
+                                <div className="action-buttons">
+                                  <button className="btn-icon edit">
+                                    <FaEdit />
+                                  </button>
+                                  <button className="btn-icon delete">
+                                    <FaTrash />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="activity-card">
+                    <h3>Thu gom pin gần đây</h3>
+                    <div className="table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Người dùng</th>
+                            <th>Loại pin</th>
+                            <th>Số lượng</th>
+                            <th>Điểm</th>
+                            <th>Ngày</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentCollections.map(collection => (
+                            <tr key={collection.id}>
+                              <td>{collection.user}</td>
+                              <td>{collection.pinType}</td>
+                              <td>{collection.quantity}</td>
+                              <td>{collection.points}</td>
+                              <td>{collection.date}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="users-content" style={{ display: 'flex', gap: 20 }}>
+                <div style={{ flex: 2 }}>
+                  <div className="content-header">
+                    <h2>Quản lý người dùng</h2>
+                    <button className="btn btn-primary" onClick={() => handleCancelEditUser()}><FaPlus /> Thêm người dùng</button>
+                  </div>
+
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Tên</th>
+                          <th>Email</th>
+                          <th>Loại</th>
+                          <th>Ngày</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentUsers.map(u => (
+                          <tr key={u._id || u.id}>
+                            <td>{u.name}</td>
+                            <td>{u.email}</td>
+                            <td>{u.role || u.type}</td>
+                            <td>{(u.createdAt || '').slice(0,10)}</td>
+                            <td>
+                              <button className="btn btn-outline" onClick={() => handleEditUser(u)}><FaEdit /></button>
+                              <button className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => deleteUser(u._id || u.id)}><FaTrash /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div className="settings-card">
+                    <h3>{editingUserId ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}</h3>
+                    <form onSubmit={submitUser}>
+                      <div className="form-group">
+                        <label>Tên</label>
+                        <input className="form-input" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Email</label>
+                        <input className="form-input" value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Mật khẩu {editingUserId ? '(để trống nếu không đổi)' : ''}</label>
+                        <input className="form-input" type="password" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} />
+                      </div>
+                      <div className="form-group">
+                        <label>Loại</label>
+                        <select className="form-input" value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}>
+                          <option value="citizen">Người dân</option>
+                          <option value="business">Doanh nghiệp</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" className="btn btn-success">{editingUserId ? 'Lưu' : 'Tạo'}</button>
+                        {editingUserId && <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={handleCancelEditUser}>Hủy</button>}
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'businesses' && (
+              <div className="businesses-content" style={{ display: 'flex', gap: 20 }}>
+                <div style={{ flex: 2 }}>
+                  <div className="content-header">
+                    <h2>Quản lý doanh nghiệp</h2>
+                    <button className="btn btn-primary" onClick={() => handleCancelEditBusiness()}><FaPlus /> Thêm doanh nghiệp</button>
+                  </div>
+
+                  <div className="pending-section">
+                    <h3>Doanh nghiệp</h3>
+                    <div className="table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Tên doanh nghiệp</th>
+                            <th>Người liên hệ</th>
+                            <th>Mã số thuế</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pendingBusinesses.map(business => (
+                            <tr key={business._id || business.id}>
+                              <td>{business.companyName}</td>
+                              <td>{business.userId ? (business.userId.name || business.userId.email) : ''}</td>
+                              <td>{business.taxCode}</td>
+                              <td>
+                                <span className={`status-badge ${business.verified ? 'active' : 'pending'}`}>{business.verified ? 'Đã duyệt' : 'Chờ duyệt'}</span>
+                              </td>
+                              <td>
+                                <div className="action-buttons">
+                                  {!business.verified && <button className="btn btn-success btn-sm" onClick={() => approveBusinessNow(business._id)}>Duyệt</button>}
+                                  <button className="btn btn-outline btn-sm" onClick={() => handleEditBusiness(business)} style={{ marginLeft: 8 }}><FaEdit /></button>
+                                  <button className="btn btn-danger btn-sm" onClick={() => deleteBusiness(business._id)} style={{ marginLeft: 8 }}><FaTrash /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div className="settings-card">
+                    <h3>{editingBusinessId ? 'Chỉnh sửa doanh nghiệp' : 'Thêm doanh nghiệp mới'}</h3>
+                    <form onSubmit={submitBusiness}>
+                      <div className="form-group">
+                        <label>User ID (tùy chọn)</label>
+                        <input className="form-input" value={businessForm.userId} onChange={e => setBusinessForm({ ...businessForm, userId: e.target.value })} placeholder="ObjectId của user (nếu có)" />
+                      </div>
+                      <div className="form-group">
+                        <label>Tên công ty</label>
+                        <input className="form-input" value={businessForm.companyName} onChange={e => setBusinessForm({ ...businessForm, companyName: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Mã số thuế</label>
+                        <input className="form-input" value={businessForm.taxCode} onChange={e => setBusinessForm({ ...businessForm, taxCode: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>
+                          <input type="checkbox" checked={businessForm.verified} onChange={e => setBusinessForm({ ...businessForm, verified: e.target.checked })} /> Đã duyệt
+                        </label>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" className="btn btn-success">{editingBusinessId ? 'Lưu' : 'Tạo'}</button>
+                        {editingBusinessId && <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={handleCancelEditBusiness}>Hủy</button>}
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Locations tab */}
+            {activeTab === 'locations' && (
+              <div>
+                <LocationsAdmin />
+              </div>
+            )}
+
+            {/* News admin */}
+            {activeTab === 'news' && (
+              <div>
+                <NewsAdmin />
+              </div>
+            )}
+
+            {/* Other tabs content placeholder */}
+            {activeTab === 'vouchers' && (
+              <div className="vouchers-content" style={{ display: 'flex', gap: 20 }}>
+                <div style={{ flex: 2 }}>
+                  <div className="content-header">
+                    <h2>Quản lý Voucher</h2>
+                    <button className="btn btn-primary" onClick={() => handleCancelEditVoucher()}><FaPlus /> Thêm voucher</button>
+                  </div>
+
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Tiêu đề</th>
+                          <th>Doanh nghiệp</th>
+                          <th>Hạn</th>
+                          <th>Số lượng</th>
+                          <th>Trạng thái</th>
+                          <th>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vouchers.map(v => (
+                          <tr key={v._id || v.id}>
+                            <td>{v.title}</td>
+                            <td>{v.businessId ? (v.businessId.companyName || v.businessId._id) : ''}</td>
+                            <td>{v.expiry ? (new Date(v.expiry)).toISOString().slice(0,10) : ''}</td>
+                            <td>{v.quantity}</td>
+                            <td>{v.status}</td>
+                            <td>
+                              <button className="btn btn-outline" onClick={() => handleEditVoucher(v)}><FaEdit /></button>
+                              <button className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => deleteVoucher(v._id || v.id)}><FaTrash /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div className="settings-card">
+                    <h3>{editingVoucherId ? 'Chỉnh sửa voucher' : 'Thêm voucher mới'}</h3>
+                    <form onSubmit={submitVoucher}>
+                      <div className="form-group">
+                        <label>Doanh nghiệp (tùy chọn)</label>
+                        <select className="form-input" value={voucherForm.businessId || ''} onChange={e => setVoucherForm({ ...voucherForm, businessId: e.target.value })}>
+                          <option value="">-- Không chọn --</option>
+                          {allBusinesses.map(b => (
+                            <option key={b._id || b.id} value={b._id || b.id}>{b.companyName || (b.userId?._id || b._id)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Tiêu đề</label>
+                        <input className="form-input" value={voucherForm.title} onChange={e => setVoucherForm({ ...voucherForm, title: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Mô tả</label>
+                        <textarea className="form-input" value={voucherForm.description} onChange={e => setVoucherForm({ ...voucherForm, description: e.target.value })} />
+                      </div>
+                      <div className="form-group">
+                        <label>Hạn</label>
+                        <input className="form-input" type="date" value={voucherForm.expiry} onChange={e => setVoucherForm({ ...voucherForm, expiry: e.target.value })} />
+                      </div>
+                      <div className="form-group">
+                        <label>Số lượng</label>
+                        <input className="form-input" type="number" value={voucherForm.quantity} onChange={e => setVoucherForm({ ...voucherForm, quantity: Number(e.target.value) })} />
+                      </div>
+                      <div className="form-group">
+                        <label>Hình ảnh</label>
+                        <input className="form-input" type="file" accept="image/*" onChange={handleFileInput} />
+                        <div className="image-previews" style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                          {voucherImages.map(url => (
+                            <div key={url} style={{ position: 'relative' }}>
+                              <img src={url} alt="preview" style={{ width: 100, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                              <button type="button" onClick={() => removeImage(url)} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 3, padding: '2px 6px', cursor: 'pointer' }}>x</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label>Điểm cần thiết để đổi</label>
+                        <input className="form-input" type="number" value={voucherForm.pointsRequired || 0} onChange={e => setVoucherForm({ ...voucherForm, pointsRequired: Number(e.target.value) })} />
+                      </div>
+                      <div className="form-group">
+                        <label>Trạng thái</label>
+                        <select className="form-input" value={voucherForm.status} onChange={e => setVoucherForm({ ...voucherForm, status: e.target.value })}>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" className="btn btn-success">{editingVoucherId ? 'Lưu' : 'Tạo'}</button>
+                        {editingVoucherId && <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={handleCancelEditVoucher}>Hủy</button>}
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab !== 'dashboard' && activeTab !== 'businesses' && activeTab !== 'locations' && activeTab !== 'news' && activeTab !== 'vouchers' && (
+              <div className="tab-content">
+                <h2>{tabs.find(tab => tab.id === activeTab)?.name}</h2>
+                <p>Nội dung cho tab {activeTab} sẽ được triển khai sớm.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;
