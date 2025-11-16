@@ -10,6 +10,8 @@ const voucherRoutes = require('./routes/voucherRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const { connectDB } = require('./config/db');
 
 dotenv.config();
@@ -40,6 +42,8 @@ app.use('/api/vouchers', voucherRoutes);
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 
 (async () => {
@@ -47,6 +51,14 @@ app.use('/api/uploads', uploadRoutes);
         await connectDB();
         const server = app.listen(PORT, () => {
             console.log(`Server is running on http://localhost:${PORT}`);
+        });
+
+        server.on('error', (err) => {
+            if (err && err.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use. Either stop the process using this port or set PORT in .env to a free port (e.g. 5001).`);
+                process.exit(1);
+            }
+            console.error('Server error', err);
         });
 
         const shutdown = async () => {

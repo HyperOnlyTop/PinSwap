@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaUsers, FaBuilding, FaRecycle, FaGift, FaChartBar, FaCog, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaUsers, FaBuilding, FaRecycle, FaGift, FaChartBar, FaCog, FaPlus, FaEdit, FaTrash, FaComments } from 'react-icons/fa';
 import LocationsAdmin from './LocationsAdmin';
 import NewsAdmin from './NewsAdmin';
 import './AdminDashboard.css';
@@ -20,6 +20,9 @@ const AdminDashboard = () => {
   const [editingVoucherId, setEditingVoucherId] = useState(null);
   const [voucherImages, setVoucherImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [editingFeedbackId, setEditingFeedbackId] = useState(null);
+  const [feedbackFormMessage, setFeedbackFormMessage] = useState('');
 
   const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -78,12 +81,35 @@ const AdminDashboard = () => {
         const locs = await locationsRes.json();
         setRecentCollections((locs || []).slice(0, 10).map(l => ({ id: l._id, user: l.name || '', pinType: l.type, quantity: 0, points: 0, date: (l.createdAt || '').slice(0,10) })));
       }
+      // don't load feedbacks here - loaded on demand when admin opens the tab
     } catch (err) {
       console.error('load admin dashboard', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // load feedbacks when admin opens the feedback tab
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (activeTab !== 'feedback') return;
+    const loadFeedbacks = async () => {
+      try {
+        const res = await fetch(`${API}/api/feedback`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+          console.error('Failed to load feedbacks', res.status);
+          setFeedbacks([]);
+          return;
+        }
+        const data = await res.json();
+        setFeedbacks(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('loadFeedbacks error', err);
+        setFeedbacks([]);
+      }
+    };
+    loadFeedbacks();
+  }, [activeTab, user]);
 
   // forms state for users and businesses
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', phone: '', address: '', role: 'citizen' });
@@ -254,6 +280,106 @@ const AdminDashboard = () => {
     }
   };
 
+  const deleteFeedback = async (id) => {
+    if (!confirm('Xác nhận xóa phản hồi này?')) return;
+    try {
+      const res = await fetch(`${API}/api/feedback/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      // refresh list
+      setFeedbacks(prev => prev.filter(f => f._id !== id));
+    } catch (err) {
+      console.error('deleteFeedback', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const [showUserHistory, setShowUserHistory] = useState(false);
+  const [historyUserId, setHistoryUserId] = useState(null);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLimit] = useState(10);
+  const [historyTotal, setHistoryTotal] = useState(0);
+
+  const loadHistoryPage = async (userId, page = 1) => {
+    try {
+      const res = await fetch(`${API}/api/feedback?userId=${userId}&page=${page}&limit=${historyLimit}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        setHistoryItems([]);
+        setHistoryTotal(0);
+        return;
+      }
+      const data = await res.json();
+      setHistoryItems(Array.isArray(data.items) ? data.items : []);
+      setHistoryTotal(data.total || 0);
+      setHistoryPage(data.page || page);
+    } catch (err) {
+      console.error('loadHistoryPage', err);
+      setHistoryItems([]);
+      setHistoryTotal(0);
+    }
+  };
+
+  const openUserHistory = async (userId) => {
+    if (!userId) return alert('Không có userId');
+    setHistoryUserId(userId);
+    setShowUserHistory(true);
+    await loadHistoryPage(userId, 1);
+  };
+
+  const closeUserHistory = () => {
+    setShowUserHistory(false);
+    setHistoryUserId(null);
+    setHistoryItems([]);
+  };
+
+  const historyPrev = () => {
+    if (historyPage <= 1) return;
+    const next = historyPage - 1;
+    loadHistoryPage(historyUserId, next);
+  };
+
+  const historyNext = () => {
+    const maxPage = Math.ceil(historyTotal / historyLimit) || 1;
+    if (historyPage >= maxPage) return;
+    const next = historyPage + 1;
+    loadHistoryPage(historyUserId, next);
+  };
+
+  const handleEditFeedback = (f) => {
+    setEditingFeedbackId(f._id);
+    setFeedbackFormMessage(f.message || '');
+  };
+
+  const cancelEditFeedback = () => {
+    setEditingFeedbackId(null);
+    setFeedbackFormMessage('');
+  };
+
+  const submitFeedbackForm = async (e) => {
+    e && e.preventDefault();
+    if (!feedbackFormMessage.trim()) return alert('Nhập nội dung phản hồi');
+    try {
+      const payload = { message: feedbackFormMessage.trim() };
+      const method = editingFeedbackId ? 'PUT' : 'POST';
+      const url = editingFeedbackId ? `${API}/api/feedback/${editingFeedbackId}` : `${API}/api/feedback`;
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'Error');
+      // update local list
+      if (editingFeedbackId) {
+        setFeedbacks(prev => prev.map(f => (f._id === editingFeedbackId ? data : f)));
+        cancelEditFeedback();
+      } else {
+        setFeedbacks(prev => [data, ...prev]);
+        setFeedbackFormMessage('');
+      }
+    } catch (err) {
+      console.error('submitFeedbackForm', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
   if (!user || user.role !== 'admin') {
     return (
       <div className="admin-dashboard">
@@ -274,6 +400,7 @@ const AdminDashboard = () => {
     { id: 'collections', name: 'Thu gom pin', icon: <FaRecycle /> },
     { id: 'locations', name: 'Điểm thu gom', icon: <FaRecycle /> },
     { id: 'vouchers', name: 'Voucher', icon: <FaGift /> },
+    { id: 'feedback', name: 'Phản hồi', icon: <FaComments /> },
     { id: 'settings', name: 'Cài đặt', icon: <FaCog /> }
   ];
 
@@ -689,6 +816,87 @@ const AdminDashboard = () => {
                     </form>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'feedback' && (
+              <div className="feedback-admin">
+                <div className="content-header">
+                  <h2>Phản hồi người dùng</h2>
+                </div>
+                <div className="feedback-form-admin" style={{ marginBottom: 12 }}>
+                  <form onSubmit={submitFeedbackForm}>
+                    <textarea placeholder="Nội dung phản hồi" value={feedbackFormMessage} onChange={e => setFeedbackFormMessage(e.target.value)} style={{ width: '100%', minHeight: 80 }} />
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <button className="btn btn-primary" type="submit">{editingFeedbackId ? 'Lưu' : 'Thêm phản hồi'}</button>
+                      {editingFeedbackId && <button type="button" className="btn btn-secondary" onClick={cancelEditFeedback}>Hủy</button>}
+                    </div>
+                  </form>
+                </div>
+
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Người dùng</th>
+                        <th>Nội dung</th>
+                        <th>Ngày</th>
+                        <th>Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedbacks.map(f => (
+                        <tr key={f._id}>
+                          <td>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span>{(f.userId && (f.userId.name || f.userId.email)) || (f.userId || 'Khách')}</span>
+                              {f.userId && (
+                                <button className="btn btn-outline" onClick={() => openUserHistory(f.userId)} style={{ padding: '4px 8px' }}>Xem lịch sử</button>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ maxWidth: 400, whiteSpace: 'normal' }}>{f.message}</td>
+                          <td>{(f.createdAt || '').slice(0,10)}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn btn-outline" onClick={() => handleEditFeedback(f)}><FaEdit /></button>
+                              <button className="btn btn-danger" onClick={() => deleteFeedback(f._id)}><FaTrash /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {showUserHistory && (
+                  <div className="modal" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', padding: 16, borderRadius: 6, width: '80%', maxWidth: 800, maxHeight: '80%', overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3>Lịch sử phản hồi của người dùng</h3>
+                        <div>
+                          <button className="btn btn-secondary" onClick={closeUserHistory}>Đóng</button>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        {historyItems.length === 0 && <div>Không có phản hồi.</div>}
+                        {historyItems.map(h => (
+                          <div key={h._id} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
+                            <div style={{ color: '#666', fontSize: 12 }}>{(h.createdAt || '').slice(0,19).replace('T',' ')}</div>
+                            <div style={{ marginTop: 6 }}>{h.message}</div>
+                          </div>
+                        ))}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                          <div>Hiển thị trang {historyPage} / {Math.max(1, Math.ceil(historyTotal / historyLimit))}</div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-outline" onClick={historyPrev} disabled={historyPage <= 1}>Trước</button>
+                            <button className="btn btn-outline" onClick={historyNext} disabled={historyPage >= Math.ceil(historyTotal / historyLimit)}>Tiếp</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

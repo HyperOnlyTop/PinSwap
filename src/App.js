@@ -18,7 +18,9 @@ import News from './pages/News';
 import NewsDetail from './pages/NewsDetail';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Profile from './pages/Profile';
+import Feedback from './pages/Feedback';
 import './App.css';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
   return (
@@ -41,10 +43,12 @@ function App() {
                 <Route path="/news" element={<News />} />
                 <Route path="/news/:id" element={<NewsDetail />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/feedback" element={<Feedback />} />
                 <Route path="/admin/*" element={<AdminDashboard />} />
               </Routes>
             </main>
             <Footer />
+            <ChatWidget />
           </div>
         </VoucherProvider>
       </PinProvider>

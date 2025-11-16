@@ -36,6 +36,7 @@ const Header = () => {
             <li><Link to="/" onClick={() => setIsMenuOpen(false)}>Trang chủ</Link></li>
             <li><Link to="/news" onClick={() => setIsMenuOpen(false)}>Tin tức</Link></li>
             <li><Link to="/map" onClick={() => setIsMenuOpen(false)}>Bản đồ</Link></li>
+            <li><Link to="/feedback" onClick={() => setIsMenuOpen(false)}>Phản hồi</Link></li>
             {user && (
               <>
                 <li><Link to="/pin-collection" onClick={() => setIsMenuOpen(false)}>Thu gom pin</Link></li>
@@ -58,7 +59,11 @@ const Header = () => {
                 )}
               </div>
               <div className="avatar" onClick={toggleUserMenu}>
-                {user.avatar}
+                {user.avatar ? (
+                  <img src={user.avatar} alt="avatar" />
+                ) : (
+                  <span>{(user.name || '').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}</span>
+                )}
               </div>
               {isUserMenuOpen && (
                 <div className="user-dropdown">

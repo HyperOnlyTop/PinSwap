@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -15,6 +15,10 @@ const Profile = () => {
     phone: user?.phone || '',
     address: user?.address || ''
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const [showChangePwd, setShowChangePwd] = useState(false);
   const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
@@ -54,6 +58,64 @@ const Profile = () => {
       address: user?.address || ''
     });
     setIsEditing(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+  };
+
+  const handlePickFile = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleCancelFile = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setSelectedFile(null);
+  };
+
+  const uploadAvatar = async () => {
+    if (!selectedFile) return;
+    try {
+      setUploading(true);
+      const API = process.env.REACT_APP_API_URL || '';
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+      form.append('file', selectedFile);
+      const res = await fetch(`${API}/api/uploads`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'Tải ảnh thất bại');
+        setUploading(false);
+        return;
+      }
+      // save profile with avatar url
+      const saveRes = await saveProfile({ avatar: data.url });
+      if (saveRes.success) {
+        toast.success('Cập nhật ảnh đại diện thành công');
+        handleCancelFile();
+      } else {
+        toast.error(saveRes.error || 'Không thể lưu ảnh đại diện');
+      }
+    } catch (err) {
+      toast.error('Lỗi khi tải ảnh: ' + (err.message || ''));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleChangePassword = () => {
@@ -100,7 +162,15 @@ const Profile = () => {
           <div className="profile-card">
             <div className="profile-header">
               <div className="profile-avatar">
-                <span className="avatar-text">{user.avatar}</span>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
+                {previewUrl ? (
+                  <img src={previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : user?.avatar ? (
+                  <img src={user.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                ) : (
+                  <span className="avatar-text">{(user.name || '').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}</span>
+                )}
+                <button className="btn btn-outline" style={{ position: 'absolute', right: -6, bottom: -6 }} onClick={handlePickFile}>Đổi ảnh</button>
               </div>
               <div className="profile-info">
                 <h2>{user.name}</h2>
@@ -139,6 +209,12 @@ const Profile = () => {
                     >
                       <FaTimes /> Hủy
                     </button>
+                  </div>
+                )}
+                {previewUrl && (
+                  <div style={{ marginTop: 8 }}>
+                    <button className="btn btn-success" onClick={uploadAvatar} disabled={uploading}>{uploading ? 'Đang tải...' : 'Tải lên'}</button>
+                    <button className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={handleCancelFile}>Hủy</button>
                   </div>
                 )}
               </div>
