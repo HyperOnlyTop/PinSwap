@@ -41,3 +41,29 @@ pids
 
 # OS
 Thumbs.db
+
+# Python virtual environment
+.venv/
+venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Pytest / testing
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+pytest_cache/
+
+# VSCode Python settings
+.vscode/
