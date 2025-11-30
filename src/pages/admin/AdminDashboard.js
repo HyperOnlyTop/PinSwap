@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaUsers, FaBuilding, FaRecycle, FaGift, FaChartBar, FaCog, FaPlus, FaEdit, FaTrash, FaComments } from 'react-icons/fa';
+import { FaUsers, FaBuilding, FaRecycle, FaGift, FaChartBar, FaCog, FaPlus, FaEdit, FaTrash, FaComments, FaCalendarAlt } from 'react-icons/fa';
+import EventsAdmin from './EventsAdmin';
 import LocationsAdmin from './LocationsAdmin';
 import NewsAdmin from './NewsAdmin';
 import './AdminDashboard.css';
@@ -111,11 +112,36 @@ const AdminDashboard = () => {
     loadFeedbacks();
   }, [activeTab, user]);
 
+  // load paginated lists when switching to tabs
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (activeTab === 'users') {
+      loadUsersPage(1, usersLimit, usersSearch);
+    }
+    if (activeTab === 'businesses') {
+      loadBusinessesPage(1, businessesLimit, businessesSearch);
+    }
+  }, [activeTab, user]);
+
   // forms state for users and businesses
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', phone: '', address: '', role: 'citizen' });
   const [editingUserId, setEditingUserId] = useState(null);
+  // users management pagination/search
+  const [usersList, setUsersList] = useState([]);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersLimit, setUsersLimit] = useState(10);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [businessForm, setBusinessForm] = useState({ userId: '', companyName: '', taxCode: '', verified: false });
   const [editingBusinessId, setEditingBusinessId] = useState(null);
+  // businesses management pagination/search
+  const [businessesList, setBusinessesList] = useState([]);
+  const [businessesPage, setBusinessesPage] = useState(1);
+  const [businessesLimit, setBusinessesLimit] = useState(10);
+  const [businessesTotal, setBusinessesTotal] = useState(0);
+  const [businessesSearch, setBusinessesSearch] = useState('');
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false);
 
   // User CRUD
   const handleEditUser = (u) => {
@@ -136,7 +162,8 @@ const AdminDashboard = () => {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Error');
-      await loadAdminData();
+      // refresh users list if on users tab
+      if (activeTab === 'users') await loadUsersPage(usersPage, usersLimit, usersSearch);
       handleCancelEditUser();
     } catch (err) {
       console.error('submitUser', err);
@@ -150,7 +177,9 @@ const AdminDashboard = () => {
       const res = await fetch(`${API}/api/admin/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Error');
-      await loadAdminData();
+      // refresh usersList if viewing users tab, otherwise refresh admin data
+      if (activeTab === 'users') await loadUsersPage(usersPage, usersLimit, usersSearch);
+      else await loadAdminData();
     } catch (err) {
       console.error('deleteUser', err);
       alert(err.message || 'Lỗi');
@@ -173,7 +202,8 @@ const AdminDashboard = () => {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(businessForm) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Error');
-      await loadAdminData();
+      if (activeTab === 'businesses') await loadBusinessesPage(businessesPage, businessesLimit, businessesSearch);
+      else await loadAdminData();
       handleCancelEditBusiness();
     } catch (err) {
       console.error('submitBusiness', err);
@@ -187,7 +217,8 @@ const AdminDashboard = () => {
       const res = await fetch(`${API}/api/admin/businesses/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Error');
-      await loadAdminData();
+      if (activeTab === 'businesses') await loadBusinessesPage(businessesPage, businessesLimit, businessesSearch);
+      else await loadAdminData();
     } catch (err) {
       console.error('deleteBusiness', err);
       alert(err.message || 'Lỗi');
@@ -356,6 +387,91 @@ const AdminDashboard = () => {
     setFeedbackFormMessage('');
   };
 
+  // Users / Businesses pagination + search loaders
+  const loadUsersPage = async (page = 1, limit = usersLimit, search = usersSearch) => {
+    setLoadingUsers(true);
+    try {
+      if (!token) {
+        alert('Không có token. Vui lòng đăng nhập lại.');
+        setUsersList([]);
+        setUsersTotal(0);
+        return;
+      }
+      const q = `?page=${page}&limit=${limit}` + (search ? `&search=${encodeURIComponent(search)}` : '');
+      const res = await fetch(`${API}/api/admin/users${q}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        let text = '';
+        try { text = await res.text(); } catch(e) {}
+        console.error('loadUsersPage bad response', res.status, text);
+        alert('Lỗi khi tải danh sách người dùng: ' + (res.status || '')); 
+        setUsersList([]);
+        setUsersTotal(0);
+        return;
+      }
+      const data = await res.json();
+      // support responses { users, total, page, limit } or plain array
+      let items = data.users || (Array.isArray(data) ? data : []);
+      // client-side filter fallback when server didn't apply search
+      if (search && items.length > 0) {
+        const s = search.toLowerCase();
+        const filtered = items.filter(it => ((it.name || '') + ' ' + (it.email || '')).toLowerCase().includes(s));
+        if (filtered.length > 0) items = filtered;
+      }
+      setUsersList(items);
+      setUsersTotal(data.total || (items.length));
+      setUsersPage(data.page || page);
+      setUsersLimit(data.limit || limit);
+    } catch (err) {
+      console.error('loadUsersPage', err);
+      alert('Lỗi khi tải danh sách người dùng');
+      setUsersList([]);
+      setUsersTotal(0);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const loadBusinessesPage = async (page = 1, limit = businessesLimit, search = businessesSearch) => {
+    setLoadingBusinesses(true);
+    try {
+      if (!token) {
+        alert('Không có token. Vui lòng đăng nhập lại.');
+        setBusinessesList([]);
+        setBusinessesTotal(0);
+        return;
+      }
+      const q = `?page=${page}&limit=${limit}` + (search ? `&search=${encodeURIComponent(search)}` : '');
+      const res = await fetch(`${API}/api/admin/businesses${q}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        let text = '';
+        try { text = await res.text(); } catch(e) {}
+        console.error('loadBusinessesPage bad response', res.status, text);
+        alert('Lỗi khi tải danh sách doanh nghiệp: ' + (res.status || ''));
+        setBusinessesList([]);
+        setBusinessesTotal(0);
+        return;
+      }
+      const data = await res.json();
+      let items = data.businesses || (Array.isArray(data) ? data : []);
+      if (search && items.length > 0) {
+        const s = search.toLowerCase();
+        const filtered = items.filter(it => ((it.companyName || '') + ' ' + (it.userId?.name || '') + ' ' + (it.userId?.email || '')).toLowerCase().includes(s));
+        if (filtered.length > 0) items = filtered;
+      }
+      setBusinessesList(items);
+      setBusinessesTotal(data.total || (items.length));
+      setBusinessesPage(data.page || page);
+      setBusinessesLimit(data.limit || limit);
+    } catch (err) {
+      console.error('loadBusinessesPage', err);
+      alert('Lỗi khi tải danh sách doanh nghiệp');
+      setBusinessesList([]);
+      setBusinessesTotal(0);
+    } finally {
+      setLoadingBusinesses(false);
+    }
+  };
+
   const submitFeedbackForm = async (e) => {
     e && e.preventDefault();
     if (!feedbackFormMessage.trim()) return alert('Nhập nội dung phản hồi');
@@ -397,6 +513,7 @@ const AdminDashboard = () => {
     { id: 'users', name: 'Người dùng', icon: <FaUsers /> },
     { id: 'businesses', name: 'Doanh nghiệp', icon: <FaBuilding /> },
     { id: 'news', name: 'Tin tức', icon: <FaChartBar /> },
+    { id: 'events', name: 'Sự kiện', icon: <FaCalendarAlt /> },
     { id: 'collections', name: 'Thu gom pin', icon: <FaRecycle /> },
     { id: 'locations', name: 'Điểm thu gom', icon: <FaRecycle /> },
     { id: 'vouchers', name: 'Voucher', icon: <FaGift /> },
@@ -510,10 +627,10 @@ const AdminDashboard = () => {
                               </td>
                               <td>
                                 <div className="action-buttons">
-                                  <button className="btn-icon edit">
+                                  <button className="btn-icon edit" title="Chỉnh sửa" onClick={() => handleEditUser(u)}>
                                     <FaEdit />
                                   </button>
-                                  <button className="btn-icon delete">
+                                  <button className="btn-icon delete" title="Xóa" onClick={() => deleteUser(u._id || u.id)}>
                                     <FaTrash />
                                   </button>
                                 </div>
@@ -561,7 +678,11 @@ const AdminDashboard = () => {
                 <div style={{ flex: 2 }}>
                   <div className="content-header">
                     <h2>Quản lý người dùng</h2>
-                    <button className="btn btn-primary" onClick={() => handleCancelEditUser()}><FaPlus /> Thêm người dùng</button>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <input placeholder="Tìm theo tên hoặc email" value={usersSearch} onChange={e => setUsersSearch(e.target.value)} className="form-input" style={{ width: 260 }} />
+                      <button className="btn btn-outline" onClick={() => loadUsersPage(1, usersLimit, usersSearch)} style={{ padding: '8px 12px' }} disabled={loadingUsers}>{loadingUsers ? 'Đang tải...' : 'Tìm'}</button>
+                      <button className="btn btn-primary" onClick={() => { handleCancelEditUser(); setUsersSearch(''); loadUsersPage(1, usersLimit, ''); }}><FaPlus /> Thêm người dùng</button>
+                    </div>
                   </div>
 
                   <div className="table-container">
@@ -576,7 +697,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {recentUsers.map(u => (
+                        {usersList.map(u => (
                           <tr key={u._id || u.id}>
                             <td>{u.name}</td>
                             <td>{u.email}</td>
@@ -590,6 +711,18 @@ const AdminDashboard = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                    <div>Hiển thị trang {usersPage} / {Math.max(1, Math.ceil(usersTotal / usersLimit))}</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <select value={usersLimit} onChange={e => { const l = Number(e.target.value); setUsersLimit(l); loadUsersPage(1, l, usersSearch); }} className="form-input" style={{ width: 88 }}>
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                      </select>
+                      <button className="btn btn-outline" onClick={() => { if (usersPage <= 1) return; loadUsersPage(usersPage - 1, usersLimit, usersSearch); }} disabled={usersPage <= 1}>Trước</button>
+                      <button className="btn btn-outline" onClick={() => { if (usersPage >= Math.ceil(usersTotal / usersLimit)) return; loadUsersPage(usersPage + 1, usersLimit, usersSearch); }} disabled={usersPage >= Math.ceil(usersTotal / usersLimit)}>Tiếp</button>
+                    </div>
                   </div>
                 </div>
 
@@ -632,7 +765,11 @@ const AdminDashboard = () => {
                 <div style={{ flex: 2 }}>
                   <div className="content-header">
                     <h2>Quản lý doanh nghiệp</h2>
-                    <button className="btn btn-primary" onClick={() => handleCancelEditBusiness()}><FaPlus /> Thêm doanh nghiệp</button>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <input placeholder="Tìm theo tên hoặc email người liên hệ" value={businessesSearch} onChange={e => setBusinessesSearch(e.target.value)} className="form-input" style={{ width: 300 }} />
+                      <button className="btn btn-outline" onClick={() => loadBusinessesPage(1, businessesLimit, businessesSearch)} style={{ padding: '8px 12px' }} disabled={loadingBusinesses}>{loadingBusinesses ? 'Đang tải...' : 'Tìm'}</button>
+                      <button className="btn btn-primary" onClick={() => { handleCancelEditBusiness(); setBusinessesSearch(''); loadBusinessesPage(1, businessesLimit, ''); }}><FaPlus /> Thêm doanh nghiệp</button>
+                    </div>
                   </div>
 
                   <div className="pending-section">
@@ -649,7 +786,7 @@ const AdminDashboard = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {pendingBusinesses.map(business => (
+                          {businessesList.map(business => (
                             <tr key={business._id || business.id}>
                               <td>{business.companyName}</td>
                               <td>{business.userId ? (business.userId.name || business.userId.email) : ''}</td>
@@ -668,6 +805,18 @@ const AdminDashboard = () => {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                      <div>Hiển thị trang {businessesPage} / {Math.max(1, Math.ceil(businessesTotal / businessesLimit))}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select value={businessesLimit} onChange={e => { const l = Number(e.target.value); setBusinessesLimit(l); loadBusinessesPage(1, l, businessesSearch); }} className="form-input" style={{ width: 88 }}>
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                        </select>
+                        <button className="btn btn-outline" onClick={() => { if (businessesPage <= 1) return; loadBusinessesPage(businessesPage - 1, businessesLimit, businessesSearch); }} disabled={businessesPage <= 1}>Trước</button>
+                        <button className="btn btn-outline" onClick={() => { if (businessesPage >= Math.ceil(businessesTotal / businessesLimit)) return; loadBusinessesPage(businessesPage + 1, businessesLimit, businessesSearch); }} disabled={businessesPage >= Math.ceil(businessesTotal / businessesLimit)}>Tiếp</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -714,6 +863,13 @@ const AdminDashboard = () => {
             {activeTab === 'news' && (
               <div>
                 <NewsAdmin />
+              </div>
+            )}
+
+            {/* Events admin */}
+            {activeTab === 'events' && (
+              <div>
+                <EventsAdmin />
               </div>
             )}
 

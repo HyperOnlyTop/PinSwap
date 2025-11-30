@@ -101,6 +101,7 @@
   font-weight: bold;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  position: relative;
 }
 
 .avatar:hover {
@@ -113,6 +114,26 @@
   object-fit: cover;
   border-radius: 50%;
   display: block;
+}
+
+/* Points badge shown near avatar */
+.avatar-badge {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  background: #ffc107;
+  color: #111;
+  padding: 3px 7px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  white-space: nowrap;
+}
+
+/* If space allows, hide the separate .user-points to avoid duplication */
+.user-points {
+  display: none;
 }
 
 .user-dropdown {

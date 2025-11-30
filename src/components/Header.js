@@ -35,17 +35,31 @@ const Header = () => {
           <ul className="nav-menu">
             <li><Link to="/" onClick={() => setIsMenuOpen(false)}>Trang chủ</Link></li>
             <li><Link to="/news" onClick={() => setIsMenuOpen(false)}>Tin tức</Link></li>
+            <li><Link to="/events" onClick={() => setIsMenuOpen(false)}>Sự kiện</Link></li>
             <li><Link to="/map" onClick={() => setIsMenuOpen(false)}>Bản đồ</Link></li>
-            <li><Link to="/feedback" onClick={() => setIsMenuOpen(false)}>Phản hồi</Link></li>
+            <li><Link to="/leaderboard" onClick={() => setIsMenuOpen(false)}>Bảng xếp hạng</Link></li>
+            
             {user && (
               <>
-                <li><Link to="/pin-collection" onClick={() => setIsMenuOpen(false)}>Thu gom pin</Link></li>
-                <li><Link to="/voucher-exchange" onClick={() => setIsMenuOpen(false)}>Đổi voucher</Link></li>
+                {(user.role === 'user' || user.role === 'citizen') && (
+                  <>
+                    <li><Link to="/pin-collection" onClick={() => setIsMenuOpen(false)}>Thu gom pin</Link></li>
+                    <li><Link to="/collection-history" onClick={() => setIsMenuOpen(false)}>Lịch sử</Link></li>
+                    <li><Link to="/voucher-exchange" onClick={() => setIsMenuOpen(false)}>Đổi voucher</Link></li>
+                  </>
+                )}
+                {(user.role === 'business') && (
+                  <li><Link to="/voucher-management" onClick={() => setIsMenuOpen(false)}>Quản lý Voucher</Link></li>
+                )}
                 {(user.role === 'admin' || user.type === 'admin') && (
-                  <li><Link to="/admin" onClick={() => setIsMenuOpen(false)}>Admin</Link></li>
+                  <>
+                    <li><Link to="/admin" onClick={() => setIsMenuOpen(false)}>Admin</Link></li>
+                    <li><Link to="/voucher-management" onClick={() => setIsMenuOpen(false)}>Quản lý Voucher</Link></li>
+                  </>
                 )}
               </>
             )}
+            
           </ul>
         </nav>
 
@@ -64,6 +78,9 @@ const Header = () => {
                 ) : (
                   <span>{(user.name || '').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}</span>
                 )}
+                {(user.role === 'citizen' || user.type === 'user' || user.role === 'user') && (
+                  <span className="avatar-badge">{user.points} đ</span>
+                )}
               </div>
               {isUserMenuOpen && (
                 <div className="user-dropdown">
@@ -73,6 +90,16 @@ const Header = () => {
                   <Link to="/profile" onClick={() => setIsUserMenuOpen(false)}>
                     <FaUser /> Hồ sơ
                   </Link>
+                  {(user.role === 'user' || user.role === 'citizen') && (
+                    <Link to="/collection-history" onClick={() => setIsUserMenuOpen(false)}>
+                      🔋 Lịch sử thu gom
+                    </Link>
+                  )}
+                  {(user.role === 'business' || user.role === 'admin') && (
+                    <Link to="/voucher-management" onClick={() => setIsUserMenuOpen(false)}>
+                      🎁 Quản lý Voucher
+                    </Link>
+                  )}
                   <button onClick={handleLogout}>
                     <FaSignOutAlt /> Đăng xuất
                   </button>

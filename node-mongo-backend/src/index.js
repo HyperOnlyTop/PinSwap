@@ -12,6 +12,12 @@ const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
+const subscribeRoutes = require('./routes/subscribeRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const registrationRoutes = require('./routes/registrationRoutes');
+const scanRoutes = require('./routes/scanRoutes');
+const collectionRoutes = require('./routes/collectionRoutes');
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
 const { connectDB } = require('./config/db');
 
 dotenv.config();
@@ -44,6 +50,12 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/subscribe', subscribeRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api/scan', scanRoutes);
+app.use('/api/collections', collectionRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 
 (async () => {

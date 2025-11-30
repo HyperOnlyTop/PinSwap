@@ -1,0 +1,6 @@
+.subscribe-form{display:flex;gap:8px}
+.subscribe-form input{flex:1;padding:8px;border-radius:4px;border:1px solid #ccc}
+.subscribe-form button{padding:8px 12px;border-radius:4px;background:#1976d2;color:#fff;border:none}
+.subscribe-status{margin-top:8px;font-size:0.9rem}
+.subscribe-status.success{color:green}
+.subscribe-status.error{color:#c00}

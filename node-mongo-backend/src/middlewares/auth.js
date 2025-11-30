@@ -39,7 +39,20 @@ const isAdmin = async (req, res, next) => {
     }
 };
 
+const isAdminOrBusiness = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (user.role === 'admin' || user.role === 'business') return next();
+        return res.status(403).json({ message: 'Require Admin or Business Role!' });
+    } catch (err) {
+        console.error('isAdminOrBusiness error', err);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 module.exports = {
     verifyToken,
     isAdmin,
+    isAdminOrBusiness,
 };

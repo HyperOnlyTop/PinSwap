@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaGoogle, FaFacebook } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import './Auth.css';
 
@@ -127,11 +127,11 @@ const Login = () => {
 
           <div className="social-login">
             <button className="btn btn-social google">
-              <img src="/images/google-icon.png" alt="Google" />
+              <FaGoogle />
               Đăng nhập với Google
             </button>
             <button className="btn btn-social facebook">
-              <img src="/images/facebook-icon.png" alt="Facebook" />
+              <FaFacebook />
               Đăng nhập với Facebook
             </button>
           </div>

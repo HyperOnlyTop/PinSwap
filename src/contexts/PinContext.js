@@ -22,44 +22,9 @@ export const PinProvider = ({ children }) => {
     { id: 8, name: 'Pin NiCd', points: 15, image: '/images/pin-nicd.jpg' }
   ]);
 
-  const [collectionHistory, setCollectionHistory] = useState([
-    {
-      id: 1,
-      userId: 1,
-      pinType: 'Pin AA',
-      quantity: 5,
-      points: 50,
-      location: 'Trung tâm thương mại Vincom',
-      date: '2024-01-15',
-      status: 'completed'
-    },
-    {
-      id: 2,
-      userId: 1,
-      pinType: 'Pin AAA',
-      quantity: 3,
-      points: 24,
-      location: 'Siêu thị BigC',
-      date: '2024-01-10',
-      status: 'completed'
-    }
-  ]);
+  const [collectionHistory, setCollectionHistory] = useState([]);
 
-  const [collectionRequests, setCollectionRequests] = useState([
-    {
-      id: 1,
-      userId: 1,
-      pinTypes: [
-        { type: 'Pin AA', quantity: 10 },
-        { type: 'Pin AAA', quantity: 5 }
-      ],
-      address: '123 Đường ABC, Quận 1, TP.HCM',
-      phone: '0123456789',
-      date: '2024-01-20',
-      status: 'pending',
-      notes: 'Pin cần thu gom tại nhà'
-    }
-  ]);
+  const [collectionRequests, setCollectionRequests] = useState([]);
 
   const addCollectionRequest = (request) => {
     const newRequest = {

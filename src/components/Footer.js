@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaEnvelope, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
 import './Footer.css';
+import SubscribeForm from './SubscribeForm';
 
 const Footer = () => {
   return (
@@ -38,6 +39,11 @@ const Footer = () => {
               <li><Link to="/guide">Hướng dẫn sử dụng</Link></li>
               <li><Link to="/download">Tải tài liệu</Link></li>
             </ul>
+          </div>
+
+          <div className="footer-section">
+            <h3>Nhận tin</h3>
+            <SubscribeForm />
           </div>
 
           <div className="footer-section">

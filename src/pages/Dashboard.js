@@ -1,15 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { usePin } from '../contexts/PinContext';
-import { useVoucher } from '../contexts/VoucherContext';
 import { FaRecycle, FaGift, FaMapMarkerAlt, FaQrcode, FaChartLine, FaTrophy } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { collectionHistory } = usePin();
-  const { exchangeHistory } = useVoucher();
+  const [collectionHistory, setCollectionHistory] = useState([]);
+  const [exchangeHistory, setExchangeHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('token');
+
+      if (!token) return;
+
+      // Fetch collection history
+      const collectionsRes = await fetch(`${API}/api/collections`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (collectionsRes.ok) {
+        const collectionsData = await collectionsRes.json();
+        setCollectionHistory(collectionsData.collections || []);
+      }
+
+      // Fetch exchange history (vouchers) - correct endpoint
+      const exchangesRes = await fetch(`${API}/api/vouchers/history/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (exchangesRes.ok) {
+        const exchangesData = await exchangesRes.json();
+        // API returns array directly
+        setExchangeHistory(Array.isArray(exchangesData) ? exchangesData : []);
+      }
+    } catch (err) {
+      console.error('Fetch dashboard data error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -24,10 +65,11 @@ const Dashboard = () => {
     );
   }
 
-  const userCollections = collectionHistory.filter(item => item.userId === user.id);
-  const userExchanges = exchangeHistory.filter(item => item.userId === user.id);
-  const totalPointsEarned = userCollections.reduce((sum, item) => sum + item.points, 0);
-  const totalPointsUsed = userExchanges.reduce((sum, item) => sum + item.pointsUsed, 0);
+  const totalPointsEarned = collectionHistory.reduce((sum, item) => sum + (item.totalPoints || 0), 0);
+  const totalPointsUsed = exchangeHistory.reduce((sum, item) => sum + (item.pointsUsed || 0), 0);
+  const totalPinsCollected = collectionHistory.reduce((sum, item) => {
+    return sum + (item.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
+  }, 0);
 
   const quickActions = [
     {
@@ -69,13 +111,13 @@ const Dashboard = () => {
     },
     {
       title: 'Pin đã thu gom',
-      value: userCollections.length,
+      value: totalPinsCollected,
       icon: <FaRecycle />,
       color: '#28a745'
     },
     {
       title: 'Voucher đã đổi',
-      value: userExchanges.length,
+      value: exchangeHistory.length,
       icon: <FaGift />,
       color: '#17a2b8'
     },
@@ -86,6 +128,15 @@ const Dashboard = () => {
       color: '#6f42c1'
     }
   ];
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric'
+    });
+  };
 
   return (
     <div className="dashboard">
@@ -129,53 +180,74 @@ const Dashboard = () => {
         {/* Recent Activity */}
         <div className="dashboard-section">
           <h2>Hoạt động gần đây</h2>
-          <div className="activity-grid">
-            <div className="activity-card">
-              <h3>Lịch sử thu gom pin</h3>
-              {userCollections.length > 0 ? (
-                <div className="activity-list">
-                  {userCollections.slice(0, 3).map((item) => (
-                    <div key={item.id} className="activity-item">
-                      <div className="activity-info">
-                        <h4>{item.pinType}</h4>
-                        <p>{item.quantity} pin - {item.points} điểm</p>
-                        <span className="activity-date">{item.date}</span>
-                      </div>
-                      <div className="activity-points">+{item.points}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="no-activity">Chưa có hoạt động thu gom pin</p>
-              )}
-              <Link to="/pin-collection" className="btn btn-outline">
-                Xem tất cả
-              </Link>
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Đang tải...</p>
             </div>
+          ) : (
+            <div className="activity-grid">
+              <div className="activity-card">
+                <h3>Lịch sử thu gom pin</h3>
+                {collectionHistory.length > 0 ? (
+                  <div className="activity-list">
+                    {collectionHistory.slice(0, 5).map((collection) => (
+                      <div key={collection._id} className="activity-item">
+                        <div className="activity-info">
+                          <h4>Thu gom pin</h4>
+                          <div className="collection-details">
+                            {collection.items && collection.items.map((item, idx) => (
+                              <p key={idx}>
+                                {item.pinType} x{item.quantity} ({item.points * item.quantity} điểm)
+                              </p>
+                            ))}
+                          </div>
+                          <span className="activity-date">{formatDate(collection.createdAt)}</span>
+                        </div>
+                        <div className="activity-points">+{collection.totalPoints}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="no-activity">Chưa có hoạt động thu gom pin</p>
+                )}
+                <Link to="/collection-history" className="btn btn-outline">
+                  Xem tất cả
+                </Link>
+              </div>
 
-            <div className="activity-card">
-              <h3>Lịch sử đổi voucher</h3>
-              {userExchanges.length > 0 ? (
-                <div className="activity-list">
-                  {userExchanges.slice(0, 3).map((item) => (
-                    <div key={item.id} className="activity-item">
-                      <div className="activity-info">
-                        <h4>{item.voucherName}</h4>
-                        <p>Mã: {item.code}</p>
-                        <span className="activity-date">{item.date}</span>
-                      </div>
-                      <div className="activity-points">-{item.pointsUsed}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="no-activity">Chưa có hoạt động đổi voucher</p>
-              )}
-              <Link to="/voucher-exchange" className="btn btn-outline">
-                Xem tất cả
-              </Link>
+              <div className="activity-card">
+                <h3>Lịch sử đổi voucher</h3>
+                {exchangeHistory.length > 0 ? (
+                  <div className="activity-list">
+                    {exchangeHistory.slice(0, 5).map((history) => {
+                      const voucher = history.voucherId;
+                      return (
+                        <div key={history._id} className="activity-item">
+                          <div className="activity-info">
+                            <h4>{voucher?.title || 'Voucher'}</h4>
+                            <p>
+                              {voucher?.discount ? `${voucher.discount}% giảm giá - ` : ''}
+                              Mã: {history.code || 'N/A'}
+                            </p>
+                            <span className="activity-date">{formatDate(history.createdAt)}</span>
+                          </div>
+                          <div className="activity-points negative">
+                            -{history.pointsUsed || 0}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="no-activity">Chưa có hoạt động đổi voucher</p>
+                )}
+                <Link to="/voucher-exchange" className="btn btn-outline">
+                  Xem tất cả
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Achievement Badges */}

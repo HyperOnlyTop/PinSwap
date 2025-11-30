@@ -1,4 +1,5 @@
 const News = require('../models/newsModel');
+const newsletterService = require('../services/newsletterService');
 
 class NewsController {
   async list(req, res) {
@@ -31,6 +32,15 @@ class NewsController {
       const news = new News({ title, content, thumbnail, images, createdBy: req.userId });
       await news.save();
       const populated = await News.findById(news._id).populate('createdBy', 'name email');
+      // trigger newsletter sending in background (do not block response)
+      (async () => {
+        try {
+          await newsletterService.sendNewsletterToSubscribers(populated);
+        } catch (bgErr) {
+          console.error('Background newsletter error', bgErr);
+        }
+      })();
+
       return res.status(201).json(populated);
     } catch (err) {
       console.error('news.create error', err);
