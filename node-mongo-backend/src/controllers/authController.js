@@ -99,6 +99,11 @@ exports.login = async (req, res) => {
         const match = await user.comparePassword(password);
         if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
+        // Check if account is locked
+        if (user.status === 'locked') {
+            return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa bởi quản trị viên' });
+        }
+
         // If client supplied the expected role, ensure it matches the user's actual role
         if (role) {
             // normalize possible legacy fields

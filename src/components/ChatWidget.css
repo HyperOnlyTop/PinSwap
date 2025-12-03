@@ -40,7 +40,76 @@
 .chat-close { background:transparent; border:none; color:#fff; font-size:16px; cursor:pointer }
 
 .chat-body { padding: 12px; overflow:auto; flex:1; background: #f8fafc }
-.chat-empty { color:#6b7280; }
+
+.chat-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-empty { 
+  color: #374151;
+  background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+  padding: 16px;
+  border-radius: 12px;
+  border-left: 4px solid #0284c7;
+}
+
+.chat-empty strong {
+  font-size: 1.1rem;
+  display: block;
+  margin-bottom: 8px;
+  color: #0c4a6e;
+}
+
+.chat-empty p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.chat-empty ul {
+  margin: 8px 0 0 20px;
+  line-height: 1.8;
+}
+
+.suggested-questions {
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.suggested-questions p {
+  margin: 0 0 10px 0;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.suggested-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.suggested-btn:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1e40af;
+  transform: translateX(4px);
+}
+
+.suggested-btn:last-child {
+  margin-bottom: 0;
+}
 
 .chat-message { margin-bottom:10px; display:flex }
 .chat-message.user { justify-content:flex-end }

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 
-const verifyToken = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
         if (!authHeader) {
@@ -13,12 +13,26 @@ const verifyToken = (req, res, next) => {
         // Use same fallback secret as token generation to avoid mismatches when JWT_SECRET isn't set in env
         const SECRET = process.env.JWT_SECRET || 'secret';
 
-        jwt.verify(token, SECRET, (err, decoded) => {
+        jwt.verify(token, SECRET, async (err, decoded) => {
             if (err) {
                 console.error('JWT verification failed:', err && err.message);
                 return res.status(401).json({ message: 'Unauthorized!' });
             }
             req.userId = decoded.id || decoded.sub;
+            
+            // Check if account is locked
+            const user = await User.findById(req.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            
+            if (user.status === 'locked') {
+                return res.status(403).json({ message: 'Account has been locked. Please contact administrator.' });
+            }
+            
+            // Attach user to request for later use
+            req.user = user;
+            
             next();
         });
     } catch (err) {
@@ -29,8 +43,11 @@ const verifyToken = (req, res, next) => {
 
 const isAdmin = async (req, res, next) => {
     try {
-        const user = await User.findById(req.userId);
+        const user = req.user || await User.findById(req.userId);
         if (!user) return res.status(404).json({ message: 'User not found' });
+        if (user.status === 'locked') {
+            return res.status(403).json({ message: 'Account has been locked' });
+        }
         if (user.role === 'admin') return next();
         return res.status(403).json({ message: 'Require Admin Role!' });
     } catch (err) {
@@ -41,9 +58,15 @@ const isAdmin = async (req, res, next) => {
 
 const isAdminOrBusiness = async (req, res, next) => {
     try {
-        const user = await User.findById(req.userId);
+        const user = req.user || await User.findById(req.userId);
         if (!user) return res.status(404).json({ message: 'User not found' });
-        if (user.role === 'admin' || user.role === 'business') return next();
+        if (user.status === 'locked') {
+            return res.status(403).json({ message: 'Account has been locked' });
+        }
+        if (user.role === 'admin' || user.role === 'business') {
+            req.user = user;
+            return next();
+        }
         return res.status(403).json({ message: 'Require Admin or Business Role!' });
     } catch (err) {
         console.error('isAdminOrBusiness error', err);

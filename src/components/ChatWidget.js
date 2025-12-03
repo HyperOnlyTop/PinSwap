@@ -124,6 +124,22 @@ export default function ChatWidget({
     } catch (_) {}
   };
 
+  // Suggested questions
+  const suggestedQuestions = [
+    "PinSwap là gì?",
+    "Làm sao để kiếm điểm?",
+    "Cách đổi voucher?",
+    "Check-in QR là gì?",
+    "Xem bảng xếp hạng ở đâu?"
+  ];
+
+  const handleSuggestedQuestion = (question) => {
+    setInput(question);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   return (
     <div className={`chat-widget ${open ? 'open' : ''}`}>
       {/* Floating button */}
@@ -148,7 +164,30 @@ export default function ChatWidget({
 
         <div className="chat-body" ref={messagesRef}>
           {messages.length === 0 && (
-            <div className="chat-empty">Xin chào — bạn muốn hỏi gì về Pin Swap?</div>
+            <div className="chat-welcome">
+              <div className="chat-empty">
+                <strong>🌱 Xin chào!</strong>
+                <p>Tôi là trợ lý AI của PinSwap. Tôi có thể giúp bạn:</p>
+                <ul>
+                  <li>Tìm hiểu về PinSwap</li>
+                  <li>Hướng dẫn cách sử dụng</li>
+                  <li>Giải đáp thắc mắc</li>
+                </ul>
+              </div>
+              
+              <div className="suggested-questions">
+                <p><strong>Câu hỏi gợi ý:</strong></p>
+                {suggestedQuestions.map((q, i) => (
+                  <button 
+                    key={i} 
+                    className="suggested-btn"
+                    onClick={() => handleSuggestedQuestion(q)}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {messages.map(m => (

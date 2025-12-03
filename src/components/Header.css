@@ -14,8 +14,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  max-width: 1200px;
+  max-width: 100%;
   margin: 0 auto;
+  flex-wrap: nowrap;
 }
 
 .logo {
@@ -26,19 +27,33 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  margin-right: 30px;
 }
 
 .nav {
   display: flex;
   align-items: center;
+  flex: 1;
+  justify-content: flex-start;
 }
 
 .nav-menu {
   display: flex;
   list-style: none;
-  gap: 30px;
+  gap: 0;
   margin: 0;
   padding: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+  justify-content: space-evenly;
+}
+
+.nav-menu li {
+  flex: 1;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .nav-menu a {
@@ -46,7 +61,9 @@
   color: #333;
   font-weight: 500;
   transition: color 0.3s ease;
-  padding: 8px 0;
+  padding: 8px 10px;
+  display: block;
+  font-size: 14px;
 }
 
 .nav-menu a:hover {
@@ -57,6 +74,7 @@
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-shrink: 0;
 }
 
 .auth-buttons {
@@ -178,9 +196,38 @@
   color: #333;
 }
 
+@media (max-width: 1200px) {
+  .nav-menu a {
+    padding: 8px 8px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .nav-menu a {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  
+  .logo {
+    font-size: 20px;
+    margin-right: 20px;
+  }
+}
+
 @media (max-width: 768px) {
   .header-content {
     flex-wrap: wrap;
+  }
+  
+  .nav-menu {
+    justify-content: flex-start;
+    gap: 0;
+  }
+  
+  .nav-menu li {
+    flex: none;
+    text-align: left;
   }
 
   .nav {

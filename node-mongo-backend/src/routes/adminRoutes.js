@@ -4,13 +4,21 @@ const adminController = require('../controllers/adminController');
 const { verifyToken, isAdmin } = require('../middlewares/auth');
 
 router.get('/stats', verifyToken, isAdmin, adminController.stats.bind(adminController));
+
+// Users routes - specific routes before :id
 router.get('/users', verifyToken, isAdmin, adminController.listUsers.bind(adminController));
 router.post('/users', verifyToken, isAdmin, adminController.createUser.bind(adminController));
+router.post('/users/:id/lock', verifyToken, isAdmin, adminController.lockUser.bind(adminController));
+router.post('/users/:id/unlock', verifyToken, isAdmin, adminController.unlockUser.bind(adminController));
 router.put('/users/:id', verifyToken, isAdmin, adminController.updateUser.bind(adminController));
 router.delete('/users/:id', verifyToken, isAdmin, adminController.deleteUser.bind(adminController));
+
+// Businesses routes - specific routes before :id
 router.get('/businesses', verifyToken, isAdmin, adminController.listBusinesses.bind(adminController));
-router.post('/businesses/:id/approve', verifyToken, isAdmin, adminController.approveBusiness.bind(adminController));
 router.post('/businesses', verifyToken, isAdmin, adminController.createBusiness ? adminController.createBusiness.bind(adminController) : (req,res)=>res.status(501).json({message:'Not implemented'}));
+router.post('/businesses/:id/approve', verifyToken, isAdmin, adminController.approveBusiness.bind(adminController));
+router.post('/businesses/:id/lock', verifyToken, isAdmin, adminController.lockBusiness.bind(adminController));
+router.post('/businesses/:id/unlock', verifyToken, isAdmin, adminController.unlockBusiness.bind(adminController));
 router.put('/businesses/:id', verifyToken, isAdmin, adminController.updateBusiness ? adminController.updateBusiness.bind(adminController) : (req,res)=>res.status(501).json({message:'Not implemented'}));
 router.delete('/businesses/:id', verifyToken, isAdmin, adminController.deleteBusiness ? adminController.deleteBusiness.bind(adminController) : (req,res)=>res.status(501).json({message:'Not implemented'}));
 

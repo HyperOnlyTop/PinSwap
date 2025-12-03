@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMapMarkerAlt, FaPhone, FaClock, FaDirections, FaFilter } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPhone, FaClock, FaDirections, FaFilter, FaQrcode } from 'react-icons/fa';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import LocationQRScanner from '../components/LocationQRScanner';
+import { useAuth } from '../contexts/AuthContext';
 import './Map.css';
 
 // Fix default icon paths for leaflet when bundled
@@ -25,6 +27,8 @@ const Map = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [mapCenter, setMapCenter] = useState([10.7769, 106.7009]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const { user, fetchMe } = useAuth();
   const mapRef = useRef();
 
   const [locations, setLocations] = useState([]);
@@ -97,12 +101,36 @@ const Map = () => {
     window.open(url, '_blank');
   };
 
+  const handleQRSuccess = async (data) => {
+    // Refresh user data to update points
+    if (fetchMe) {
+      await fetchMe();
+    }
+  };
+
   return (
     <div className="map-page">
+      {showQRScanner && (
+        <LocationQRScanner 
+          onClose={() => setShowQRScanner(false)}
+          onSuccess={handleQRSuccess}
+        />
+      )}
+      
       <div className="container">
         <div className="page-header">
-          <h1>Bản đồ điểm thu gom</h1>
-          <p>Tìm các điểm thu gom pin gần bạn nhất</p>
+          <div>
+            <h1>Bản đồ điểm thu gom</h1>
+            <p>Tìm các điểm thu gom pin gần bạn nhất</p>
+          </div>
+          {user && user.role === 'citizen' && (
+            <button 
+              className="btn-qr-scan"
+              onClick={() => setShowQRScanner(true)}
+            >
+              <FaQrcode /> Quét QR Check-in
+            </button>
+          )}
         </div>
 
         <div className="map-content">

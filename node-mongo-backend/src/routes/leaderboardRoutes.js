@@ -21,9 +21,9 @@ router.get('/', verifyToken, async (req, res) => {
       dateFilter = { createdAt: { $gte: monthAgo } };
     }
     
-    // Get all users (not just role 'user', to include everyone)
-    const users = await User.find({})
-      .select('fullName email phone points role')
+    // Get all users (only citizens/regular users, exclude business and admin)
+    const users = await User.find({ role: { $in: ['citizen', 'user'] } })
+      .select('fullName email phone points role avatar')
       .lean();
     
     console.log(`Found ${users.length} users`);

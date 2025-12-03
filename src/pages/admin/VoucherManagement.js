@@ -29,7 +29,9 @@ const VoucherManagement = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const businessId = user.role === 'business' ? user._id : 'all';
+      
+      // For business users, use 'me' to let backend find their business
+      const businessId = user.role === 'business' ? 'me' : 'all';
       
       const response = await fetch(
         `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vouchers/business/${businessId}`,
@@ -115,7 +117,8 @@ const VoucherManagement = () => {
         },
         body: JSON.stringify({
           ...formData,
-          businessId: user.role === 'business' ? user._id : formData.businessId
+          // Don't send businessId for business users - backend will handle it
+          businessId: user.role === 'admin' ? formData.businessId : undefined
         })
       });
 

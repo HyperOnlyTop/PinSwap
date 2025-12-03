@@ -186,6 +186,64 @@ const AdminDashboard = () => {
     }
   };
 
+  const lockUser = async (id) => {
+    if (!confirm('Bạn có chắc muốn khóa tài khoản này?')) return;
+    try {
+      const res = await fetch(`${API}/api/admin/users/${id}/lock`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      if (activeTab === 'users') await loadUsersPage(usersPage, usersLimit, usersSearch);
+      else await loadAdminData();
+      alert('Đã khóa tài khoản thành công');
+    } catch (err) {
+      console.error('lockUser', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const unlockUser = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/admin/users/${id}/unlock`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      if (activeTab === 'users') await loadUsersPage(usersPage, usersLimit, usersSearch);
+      else await loadAdminData();
+      alert('Đã mở khóa tài khoản thành công');
+    } catch (err) {
+      console.error('unlockUser', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const lockBusiness = async (id) => {
+    if (!confirm('Bạn có chắc muốn khóa doanh nghiệp này?')) return;
+    try {
+      const res = await fetch(`${API}/api/admin/businesses/${id}/lock`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      if (activeTab === 'businesses') await loadBusinessesPage(businessesPage, businessesLimit, businessesSearch);
+      else await loadAdminData();
+      alert('Đã khóa doanh nghiệp thành công');
+    } catch (err) {
+      console.error('lockBusiness', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
+  const unlockBusiness = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/admin/businesses/${id}/unlock`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error');
+      if (activeTab === 'businesses') await loadBusinessesPage(businessesPage, businessesLimit, businessesSearch);
+      else await loadAdminData();
+      alert('Đã mở khóa doanh nghiệp thành công');
+    } catch (err) {
+      console.error('unlockBusiness', err);
+      alert(err.message || 'Lỗi');
+    }
+  };
+
   // Business CRUD & approve
   const handleEditBusiness = (b) => {
     setEditingBusinessId(b._id);
@@ -630,6 +688,15 @@ const AdminDashboard = () => {
                                   <button className="btn-icon edit" title="Chỉnh sửa" onClick={() => handleEditUser(u)}>
                                     <FaEdit />
                                   </button>
+                                  {(u.status === 'locked') ? (
+                                    <button className="btn-icon unlock" title="Mở khóa" onClick={() => unlockUser(u._id || u.id)}>
+                                      🔓
+                                    </button>
+                                  ) : (
+                                    <button className="btn-icon lock" title="Khóa tài khoản" onClick={() => lockUser(u._id || u.id)}>
+                                      🔒
+                                    </button>
+                                  )}
                                   <button className="btn-icon delete" title="Xóa" onClick={() => deleteUser(u._id || u.id)}>
                                     <FaTrash />
                                   </button>
@@ -692,6 +759,7 @@ const AdminDashboard = () => {
                           <th>Tên</th>
                           <th>Email</th>
                           <th>Loại</th>
+                          <th>Trạng thái</th>
                           <th>Ngày</th>
                           <th>Hành động</th>
                         </tr>
@@ -702,9 +770,19 @@ const AdminDashboard = () => {
                             <td>{u.name}</td>
                             <td>{u.email}</td>
                             <td>{u.role || u.type}</td>
+                            <td>
+                              <span className={`status-badge ${u.status === 'locked' ? 'locked' : 'active'}`}>
+                                {u.status === 'locked' ? 'Đã khóa' : 'Hoạt động'}
+                              </span>
+                            </td>
                             <td>{(u.createdAt || '').slice(0,10)}</td>
                             <td>
                               <button className="btn btn-outline" onClick={() => handleEditUser(u)}><FaEdit /></button>
+                              {u.status === 'locked' ? (
+                                <button className="btn btn-success" style={{ marginLeft: 8 }} onClick={() => unlockUser(u._id || u.id)} title="Mở khóa">🔓</button>
+                              ) : (
+                                <button className="btn btn-warning" style={{ marginLeft: 8 }} onClick={() => lockUser(u._id || u.id)} title="Khóa">🔒</button>
+                              )}
                               <button className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => deleteUser(u._id || u.id)}><FaTrash /></button>
                             </td>
                           </tr>
@@ -798,6 +876,11 @@ const AdminDashboard = () => {
                                 <div className="action-buttons">
                                   {!business.verified && <button className="btn btn-success btn-sm" onClick={() => approveBusinessNow(business._id)}>Duyệt</button>}
                                   <button className="btn btn-outline btn-sm" onClick={() => handleEditBusiness(business)} style={{ marginLeft: 8 }}><FaEdit /></button>
+                                  {business.verified ? (
+                                    <button className="btn btn-warning btn-sm" onClick={() => lockBusiness(business._id)} style={{ marginLeft: 8 }} title="Khóa">🔒</button>
+                                  ) : (
+                                    <button className="btn btn-success btn-sm" onClick={() => unlockBusiness(business._id)} style={{ marginLeft: 8 }} title="Mở khóa">🔓</button>
+                                  )}
                                   <button className="btn btn-danger btn-sm" onClick={() => deleteBusiness(business._id)} style={{ marginLeft: 8 }}><FaTrash /></button>
                                 </div>
                               </td>

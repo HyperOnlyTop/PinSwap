@@ -1,6 +1,8 @@
 const Location = require('../models/locationModel');
 const User = require('../models/userModel');
 const Business = require('../models/businessModel');
+const CheckIn = require('../models/checkInModel');
+const crypto = require('crypto');
 
 class LocationController {
   // public list with optional type/status filters
@@ -51,6 +53,10 @@ class LocationController {
       }
 
       const location = new Location({ businessId, name, address, latitude, longitude, openHours, type });
+      
+      // Generate unique QR code for this location
+      location.qrCode = crypto.randomBytes(16).toString('hex');
+      
       await location.save();
       return res.status(201).json(location);
     } catch (err) {
@@ -121,6 +127,103 @@ class LocationController {
       return res.json({ message: 'Deleted', item: deleted });
     } catch (err) {
       console.error('location.remove error', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // Check-in with QR code to earn points
+  async checkIn(req, res) {
+    try {
+      const { qrCode } = req.body;
+      const userId = req.userId;
+
+      if (!qrCode) {
+        return res.status(400).json({ message: 'QR code is required' });
+      }
+
+      // Find location by QR code
+      const location = await Location.findOne({ qrCode, status: 'active' });
+      if (!location) {
+        return res.status(404).json({ message: 'Invalid QR code or location not found' });
+      }
+
+      // Check if user already checked in today at this location
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const existingCheckIn = await CheckIn.findOne({
+        userId,
+        locationId: location._id,
+        checkInTime: { $gte: today, $lt: tomorrow }
+      });
+
+      if (existingCheckIn) {
+        return res.status(400).json({ 
+          message: 'Bạn đã check-in tại địa điểm này hôm nay rồi',
+          alreadyCheckedIn: true
+        });
+      }
+
+      // Award points to user
+      const pointsToAward = location.pointsReward || 50;
+      const user = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { points: pointsToAward } },
+        { new: true }
+      );
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Create check-in record
+      const checkIn = new CheckIn({
+        userId,
+        locationId: location._id,
+        pointsEarned: pointsToAward
+      });
+      await checkIn.save();
+
+      return res.json({
+        success: true,
+        message: `Check-in thành công! Bạn nhận được ${pointsToAward} điểm`,
+        pointsEarned: pointsToAward,
+        totalPoints: user.points,
+        location: {
+          name: location.name,
+          address: location.address
+        },
+        checkIn
+      });
+    } catch (err) {
+      console.error('location.checkIn error', err);
+      return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+  }
+
+  // Get user's check-in history
+  async getCheckInHistory(req, res) {
+    try {
+      const userId = req.userId;
+      const { limit = 20, skip = 0 } = req.query;
+
+      const checkIns = await CheckIn.find({ userId })
+        .populate('locationId', 'name address type')
+        .sort({ checkInTime: -1 })
+        .limit(parseInt(limit))
+        .skip(parseInt(skip));
+
+      const total = await CheckIn.countDocuments({ userId });
+
+      return res.json({
+        checkIns,
+        total,
+        hasMore: total > parseInt(skip) + parseInt(limit)
+      });
+    } catch (err) {
+      console.error('location.getCheckInHistory error', err);
       return res.status(500).json({ message: 'Server error' });
     }
   }

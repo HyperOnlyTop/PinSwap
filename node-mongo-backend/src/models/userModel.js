@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ROLES = ['admin', 'citizen', 'business'];
-const STATUSES = ['active', 'looked']; 
+const STATUSES = ['active', 'locked']; 
 const userSchema = new mongoose.Schema({
     name: {
         type: String,

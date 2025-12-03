@@ -88,10 +88,14 @@ class VoucherController {
         return res.status(400).json({ message: 'Missing required fields: title, pointsRequired, quantity' });
       }
 
-      // If user is business role, use their own businessId
+      // If user is business role, find their business ID
       let finalBusinessId = businessId;
       if (req.user && req.user.role === 'business') {
-        finalBusinessId = req.userId; // business user's ID is their business ID
+        const business = await Business.findOne({ userId: req.userId });
+        if (!business) {
+          return res.status(404).json({ message: 'Business profile not found' });
+        }
+        finalBusinessId = business._id;
       }
 
       const voucher = new Voucher({
@@ -129,7 +133,8 @@ class VoucherController {
 
       // If user is business, check they own this voucher
       if (req.user && req.user.role === 'business') {
-        if (voucher.businessId.toString() !== req.userId) {
+        const business = await Business.findOne({ userId: req.userId });
+        if (!business || voucher.businessId.toString() !== business._id.toString()) {
           return res.status(403).json({ message: 'You can only update your own vouchers' });
         }
       }
@@ -166,7 +171,8 @@ class VoucherController {
 
       // If user is business, check they own this voucher
       if (req.user && req.user.role === 'business') {
-        if (voucher.businessId.toString() !== req.userId) {
+        const business = await Business.findOne({ userId: req.userId });
+        if (!business || voucher.businessId.toString() !== business._id.toString()) {
           return res.status(403).json({ message: 'You can only delete your own vouchers' });
         }
       }
@@ -187,7 +193,11 @@ class VoucherController {
       
       // If user is business role, only allow them to see their own vouchers
       if (req.user && req.user.role === 'business') {
-        businessId = req.userId;
+        const business = await Business.findOne({ userId: req.userId });
+        if (!business) {
+          return res.status(404).json({ message: 'Business profile not found' });
+        }
+        businessId = business._id;
       }
 
       const vouchers = await Voucher.find({ businessId }).populate('businessId', 'companyName').sort({ createdAt: -1 });

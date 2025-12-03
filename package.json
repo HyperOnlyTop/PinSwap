@@ -15,6 +15,7 @@
     "chart.js": "^4.2.0",
     "date-fns": "^2.29.0",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.1",
     "leaflet": "^1.9.4",
     "qr-scanner": "^1.4.2",

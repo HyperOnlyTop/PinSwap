@@ -87,6 +87,86 @@ class AdminController {
     }
   }
 
+  // POST /api/admin/users/:id/lock - Lock user account
+  async lockUser(req, res) {
+    try {
+      const { id } = req.params;
+      const user = await User.findById(id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      
+      if (user.role === 'admin') {
+        return res.status(403).json({ message: 'Cannot lock admin account' });
+      }
+      
+      user.status = 'locked';
+      await user.save();
+      return res.json({ message: 'User account locked', user: user.toJSON() });
+    } catch (err) {
+      console.error('admin.lockUser error', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // POST /api/admin/users/:id/unlock - Unlock user account
+  async unlockUser(req, res) {
+    try {
+      const { id } = req.params;
+      const user = await User.findById(id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      
+      user.status = 'active';
+      await user.save();
+      return res.json({ message: 'User account unlocked', user: user.toJSON() });
+    } catch (err) {
+      console.error('admin.unlockUser error', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // POST /api/admin/businesses/:id/lock - Lock business account
+  async lockBusiness(req, res) {
+    try {
+      const { id } = req.params;
+      const business = await Business.findById(id);
+      if (!business) return res.status(404).json({ message: 'Business not found' });
+      
+      // If business has a userId, lock that user too
+      if (business.userId) {
+        await User.findByIdAndUpdate(business.userId, { status: 'locked' });
+      }
+      
+      business.verified = false;
+      await business.save();
+      
+      return res.json({ message: 'Business account locked', business: business.toJSON() });
+    } catch (err) {
+      console.error('admin.lockBusiness error', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // POST /api/admin/businesses/:id/unlock - Unlock business account
+  async unlockBusiness(req, res) {
+    try {
+      const { id } = req.params;
+      const business = await Business.findById(id);
+      if (!business) return res.status(404).json({ message: 'Business not found' });
+      
+      // If business has a userId, unlock that user too
+      if (business.userId) {
+        await User.findByIdAndUpdate(business.userId, { status: 'active' });
+      }
+      
+      business.verified = true;
+      await business.save();
+      
+      return res.json({ message: 'Business account unlocked', business: business.toJSON() });
+    } catch (err) {
+      console.error('admin.unlockBusiness error', err);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  }
+
   // GET /api/admin/businesses?pending=true
   async listBusinesses(req, res) {
     try {

@@ -102,7 +102,19 @@ const Leaderboard = () => {
               
               <div className="user-info">
                 <div className="user-avatar">
-                  {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                  {user.avatar ? (
+                    <img 
+                      src={user.avatar.startsWith('http') ? user.avatar : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${user.avatar}`} 
+                      alt={user.fullName || 'User'} 
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className="avatar-fallback" style={{ display: user.avatar ? 'none' : 'flex' }}>
+                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                  </div>
                 </div>
                 <div className="user-details">
                   <h4>{user.fullName || 'Người dùng'}</h4>

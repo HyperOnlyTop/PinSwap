@@ -238,6 +238,33 @@
   color: white;
 }
 
+.btn-icon.lock {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffc107;
+  font-size: 14px;
+}
+
+.btn-icon.lock:hover {
+  background: #ffc107;
+  color: white;
+}
+
+.btn-icon.unlock {
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+  font-size: 14px;
+}
+
+.btn-icon.unlock:hover {
+  background: #28a745;
+  color: white;
+}
+
+.status-badge.locked {
+  background: #dc3545;
+  color: white;
+}
+
 .content-header {
   display: flex;
   justify-content: space-between;

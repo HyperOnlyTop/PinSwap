@@ -41,7 +41,7 @@ const Header = () => {
             
             {user && (
               <>
-                {(user.role === 'user' || user.role === 'citizen') && (
+                {(user.role === 'user' || user.role === 'citizen' || user.role === "admin") && (
                   <>
                     <li><Link to="/pin-collection" onClick={() => setIsMenuOpen(false)}>Thu gom pin</Link></li>
                     <li><Link to="/collection-history" onClick={() => setIsMenuOpen(false)}>Lịch sử</Link></li>
@@ -54,11 +54,12 @@ const Header = () => {
                 {(user.role === 'admin' || user.type === 'admin') && (
                   <>
                     <li><Link to="/admin" onClick={() => setIsMenuOpen(false)}>Admin</Link></li>
-                    <li><Link to="/voucher-management" onClick={() => setIsMenuOpen(false)}>Quản lý Voucher</Link></li>
+                    
                   </>
                 )}
               </>
             )}
+            <li><Link to="/feedback" onClick={() => setIsMenuOpen(false)}>Phản hồi</Link></li>
             
           </ul>
         </nav>

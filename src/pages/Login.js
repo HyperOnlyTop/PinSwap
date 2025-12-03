@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FaEye, FaEyeSlash, FaGoogle, FaFacebook } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+import LockedAccountModal from '../components/LockedAccountModal';
 import './Auth.css';
 
 const Login = () => {
@@ -13,8 +14,22 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showLockedModal, setShowLockedModal] = useState(false);
+  const [lockedMessage, setLockedMessage] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Check if redirected due to locked account
+    if (searchParams.get('locked') === 'true') {
+      const savedMessage = sessionStorage.getItem('lockedAccountMessage');
+      setLockedMessage(savedMessage || 'Tài khoản của bạn đã bị khóa bởi quản trị viên trong khi bạn đang sử dụng hệ thống.');
+      setShowLockedModal(true);
+      // Clear the message after showing
+      sessionStorage.removeItem('lockedAccountMessage');
+    }
+  }, [searchParams]);
 
   const handleChange = (e) => {
     setFormData({
@@ -34,7 +49,13 @@ const Login = () => {
         toast.success('Đăng nhập thành công!');
         navigate('/dashboard');
       } else {
-        toast.error(result.error || 'Đăng nhập thất bại');
+        // Check if error is due to locked account
+        if (result.error && (result.error.includes('khóa') || result.error.includes('locked'))) {
+          setLockedMessage(result.error);
+          setShowLockedModal(true);
+        } else {
+          toast.error(result.error || 'Đăng nhập thất bại');
+        }
       }
     } catch (error) {
       toast.error('Có lỗi xảy ra, vui lòng thử lại');
@@ -45,6 +66,11 @@ const Login = () => {
 
   return (
     <div className="auth-page">
+      <LockedAccountModal 
+        show={showLockedModal} 
+        onClose={() => setShowLockedModal(false)}
+        message={lockedMessage}
+      />
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-header">
